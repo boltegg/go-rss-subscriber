@@ -1,8 +1,10 @@
 package grs
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/mmcdole/gofeed"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -34,6 +36,12 @@ func NewRssSubscriber(link string, interval time.Duration) (rss *RssSubscriber, 
 		lastElementTime: time.Time{},
 		updatesChannel:  make(chan *gofeed.Item),
 	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	rss.parser.Client = &http.Client{Transport: tr}
 
 	feed, err := rss.parser.ParseURL(link)
 	if err != nil {
