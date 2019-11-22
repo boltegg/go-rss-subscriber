@@ -4,7 +4,7 @@
 go get github.com/boltegg/go-rss-subscriber
 ```
 
-##Usage
+## Usage
 ```
 rss, err := NewRssSubscriber("https://www.reddit.com/.rss", time.Second * 7)
 if err != nil {
