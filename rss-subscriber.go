@@ -1,10 +1,8 @@
 package grs
 
 import (
-	"crypto/tls"
 	"fmt"
 	"github.com/mmcdole/gofeed"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -13,10 +11,9 @@ import (
 type RssSubscriber struct {
 	link            string
 	interval        time.Duration
-	parser          *gofeed.Parser
+	Parser          *gofeed.Parser
 	currentFeed     *feedMutex
 	lastElementTime time.Time
-	updatesChannel  chan *gofeed.Item
 }
 
 type feedMutex struct {
@@ -24,26 +21,25 @@ type feedMutex struct {
 	sync.RWMutex
 }
 
-// NewRssSubscriber returns create a new subscriber
-// it will request a link with a given interval
-func NewRssSubscriber(link string, interval time.Duration) (rss *RssSubscriber, err error) {
+// NewRssSubscriber create a new subscriber
+func NewRssSubscriber(link string, interval time.Duration) (rss *RssSubscriber) {
 
 	rss = &RssSubscriber{
 		link:            link,
 		interval:        interval,
-		parser:          gofeed.NewParser(),
+		Parser:          gofeed.NewParser(),
 		currentFeed:     &feedMutex{},
 		lastElementTime: time.Time{},
-		updatesChannel:  make(chan *gofeed.Item),
 	}
+	return
+}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+// Subscribe to the feed
+func (rss *RssSubscriber) Subscribe() (ch chan *gofeed.Item, err error) {
 
-	rss.parser.Client = &http.Client{Transport: tr}
+	ch = make(chan *gofeed.Item)
 
-	feed, err := rss.parser.ParseURL(link)
+	feed, err := rss.Parser.ParseURL(rss.link)
 	if err != nil {
 		return
 	}
@@ -60,15 +56,8 @@ func NewRssSubscriber(link string, interval time.Duration) (rss *RssSubscriber, 
 		}
 	}
 
-	go rss.subscribe()
-
+	go rss.subscribe(ch)
 	return
-}
-
-// GetUpdatesChannel returns channel
-// for get updates from rss
-func (rss *RssSubscriber) GetUpdatesChannel() (c chan *gofeed.Item) {
-	return rss.updatesChannel
 }
 
 // GetCurrentFeed returns actual rss feed
@@ -78,11 +67,11 @@ func (rss *RssSubscriber) GetCurrentFeed() (feed gofeed.Feed) {
 	return rss.currentFeed.Feed
 }
 
-func (rss *RssSubscriber) subscribe() {
+func (rss *RssSubscriber) subscribe(ch chan *gofeed.Item) {
 	for {
 		time.Sleep(rss.interval)
 
-		feed, err := rss.parser.ParseURL(rss.link)
+		feed, err := rss.Parser.ParseURL(rss.link)
 		if err != nil {
 			continue
 		}
@@ -101,7 +90,7 @@ func (rss *RssSubscriber) subscribe() {
 			}
 
 			if item.PublishedParsed.Sub(rss.lastElementTime) > 0 {
-				rss.updatesChannel <- item
+				ch <- item
 			}
 		}
 		rss.lastElementTime = lastElementTmp
